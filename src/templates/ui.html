@@ -1,0 +1,445 @@
+<template id="wplus-trigger-template">
+    <button
+        class="wplus-b"
+        id="wplus-btn"
+        type="button"
+        title="Open WPlus"
+        aria-label="Open WPlus"
+        aria-expanded="false"
+    >
+        <svg viewBox="0 0 24 24">
+            <path
+                d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 16v-2h2v2h-2zm0-4V7h2v6h-2z"
+            />
+        </svg>
+        <span class="wd"></span>
+        <span class="wc" id="wplus-c"></span>
+    </button>
+</template>
+<template id="wplus-panel-template">
+    <div class="wpp" id="wplus-panel">
+        <div class="wpp-h">
+            <div class="wpp-hb" id="wp-x">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"
+                    />
+                </svg>
+            </div>
+            <div class="wpp-ht">WPlus</div>
+        </div>
+        <div id="wplus-update-bar">
+            <span>&#11014;</span
+            ><span id="wplus-update-text">Update available</span>
+        </div>
+        <div class="wpp-sc">
+            <div class="wpp-sec">Privacy</div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M6 13c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm0 4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1zm0-8c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Blur messages</div>
+                    <div class="wpp-rd">Hover to reveal</div>
+                </div>
+                <div class="wpp-tg" data-t="blurMessages"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92C19.14 16.38 20 14.26 20 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Blur contacts</div>
+                    <div class="wpp-rd">Hides names everywhere</div>
+                </div>
+                <div class="wpp-tg" data-t="blurContacts"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Blur photos</div>
+                    <div class="wpp-rd">Hides all images</div>
+                </div>
+                <div class="wpp-tg" data-t="blurPhotos"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Blur avatars</div>
+                    <div class="wpp-rd">Hides profile pictures everywhere</div>
+                </div>
+                <div class="wpp-tg" data-t="blurAvatar"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Hide typing</div>
+                    <div class="wpp-rd">Others can't see you type</div>
+                </div>
+                <div class="wpp-tg" data-t="hideTyping"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92C19.14 16.38 20 14.26 20 12c-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Hide online</div>
+                    <div class="wpp-rd">Appear offline</div>
+                </div>
+                <div class="wpp-tg" data-t="hideOnline"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">No blue ticks</div>
+                    <div class="wpp-rd">Read without receipts</div>
+                </div>
+                <div class="wpp-tg" data-t="disableReceipts"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Private listen</div>
+                    <div class="wpp-rd">No play notification</div>
+                </div>
+                <div class="wpp-tg" data-t="playAudioPrivate"></div>
+            </div>
+            <div class="wpp-sec">Deleted messages</div>
+            <div class="wpp-r" data-a="del">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Saved messages</div>
+                    <div class="wpp-rd">Tap to view</div>
+                </div>
+                <div class="wpp-rv" id="wp-dc"></div>
+            </div>
+            <div class="wpp-sub" id="wp-dl"></div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r" data-a="del-clear">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8.46 11.88l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Clear all</div>
+                    <div class="wpp-rd">Remove saved messages</div>
+                </div>
+            </div>
+            <div class="wpp-sec">Tools</div>
+            <div class="wpp-r" data-a="export">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Export contacts</div>
+                    <div class="wpp-rd">Download as CSV</div>
+                </div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r" data-a="stats">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Chat stats</div>
+                    <div class="wpp-rd">View analytics</div>
+                </div>
+            </div>
+            <div class="wpp-sub" id="wp-sp"></div>
+            <div class="wpp-div"></div>
+            <div class="wpp-sec">Settings</div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Check for updates</div>
+                    <div class="wpp-rd">Notify when new version available</div>
+                </div>
+                <div class="wpp-tg" data-t="checkUpdates"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Debug logging</div>
+                    <div class="wpp-rd">Track all WPlus events</div>
+                </div>
+                <div class="wpp-tg" data-t="debugEnabled"></div>
+            </div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r" data-a="debug-status">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">System status</div>
+                    <div class="wpp-rd">Engine, hooks, storage info</div>
+                </div>
+            </div>
+            <div class="wpp-sub" id="wp-ds"></div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r" data-a="debug-log">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">View debug log</div>
+                    <div class="wpp-rd">All events and errors</div>
+                </div>
+            </div>
+            <div class="wpp-sub" id="wp-dlog"></div>
+            <div class="wpp-div"></div>
+            <div class="wpp-r" data-a="debug-clear">
+                <div class="wpp-ri">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8.46 11.88l1.41-1.41L12 12.59l2.12-2.12 1.41 1.41L13.41 14l2.12 2.12-1.41 1.41L12 15.41l-2.12 2.12-1.41-1.41L10.59 14l-2.13-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4z"
+                        />
+                    </svg>
+                </div>
+                <div class="wpp-rn">
+                    <div class="wpp-rt">Clear debug log</div>
+                </div>
+            </div>
+        </div>
+        <div class="wpp-ft">
+            <a href="https://github.com/KuchiSofts/WPlus" target="_blank"
+                >WPlus v2.0 by KuchiSofts</a
+            >
+        </div>
+    </div>
+</template>
+<template id="wplus-empty-template"
+    ><div class="wpp-dme" data-text></div
+></template>
+<template id="wplus-message-row-template">
+    <div class="wpp-dm wpp-dm-row" data-idx="">
+        <span class="wpp-dm-icon" data-icon></span>
+        <div class="wpp-dm-main">
+            <div class="wpp-dm-header">
+                <span class="wpp-dms wpp-dm-sender" data-sender></span
+                ><span class="wpp-dmt" data-time></span>
+            </div>
+            <div class="wpp-dm-body" data-body></div>
+        </div>
+        <span class="wpp-dm-nav" data-nav="" data-go-to-chat>&#8594;</span>
+    </div>
+</template>
+<template id="wplus-stats-template"
+    ><div class="wpp-st" data-text></div
+></template>
+<template id="wplus-status-template"
+    ><div class="wpp-st wpp-st-compact" data-text></div
+></template>
+<template id="wplus-debug-row-template">
+    <div class="wplus-debug-entry">
+        <span class="wplus-debug-time" data-time></span
+        ><span class="wplus-debug-category" data-category></span
+        ><span class="wplus-debug-message" data-message></span
+        ><span class="wplus-debug-data" data-data></span>
+    </div>
+</template>
+<template id="wplus-preview-template">
+    <div class="wplus-preview-overlay" id="wplus-preview">
+        <div class="wplus-preview-popup">
+            <div class="wplus-preview-header">
+                <div class="wplus-preview-avatar"><span>+</span></div>
+                <div class="wplus-preview-sender" data-sender></div>
+                <div class="wplus-preview-time" data-header-time></div>
+                <div class="wplus-preview-close" id="wplus-preview-close">
+                    &#10005;
+                </div>
+            </div>
+            <div class="wplus-preview-body">
+                <div class="wplus-preview-bubble">
+                    <div class="wplus-preview-deleted">
+                        &#128683; This message was deleted
+                    </div>
+                    <div data-media></div>
+                    <div class="wplus-preview-time-type">
+                        <span class="wplus-preview-type" data-type></span
+                        ><span class="wplus-preview-clock" data-clock></span>
+                    </div>
+                </div>
+            </div>
+            <div class="wplus-preview-footer">
+                <button
+                    class="wplus-preview-button wplus-preview-goto"
+                    id="wplus-preview-goto"
+                >
+                    &#8594; Go to chat</button
+                ><button
+                    class="wplus-preview-button wplus-preview-download"
+                    id="wplus-preview-dl"
+                    hidden
+                >
+                    &#11123; Save file
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+<template id="wplus-preview-image-template"
+    ><img class="wplus-preview-img" id="wplus-preview-img" alt=""
+/></template>
+<template id="wplus-preview-image-hint-template"
+    ><div class="wplus-preview-image-hint">Click image to zoom</div></template
+>
+<template id="wplus-preview-video-thumb-template"
+    ><div class="wplus-preview-video-thumb" id="wplus-preview-vid-thumb">
+        <img alt="" />
+        <div class="wplus-preview-play">&#9654;</div>
+    </div></template
+>
+<template id="wplus-preview-video-note-template"
+    ><div class="wplus-preview-video-note">Video thumbnail only</div></template
+>
+<template id="wplus-preview-video-template"
+    ><video
+        class="wplus-preview-video"
+        id="wplus-preview-vid"
+        controls
+        playsinline
+    >
+        <source /></video
+></template>
+<template id="wplus-preview-fullscreen-template"
+    ><div class="wplus-preview-fullscreen" id="wplus-preview-fullscreen">
+        <span>&#9974; Fullscreen</span>
+    </div></template
+>
+<template id="wplus-preview-audio-template"
+    ><div class="wplus-preview-audio">
+        <span>&#127908;</span><audio controls></audio></div
+></template>
+<template id="wplus-preview-unavailable-template"
+    ><div class="wplus-preview-unavailable" data-label></div
+></template>
+<template id="wplus-preview-caption-template"
+    ><div class="wplus-preview-caption" data-text></div
+></template>
+<template id="wplus-preview-text-template"
+    ><div class="wplus-preview-text" data-text></div
+></template>
+<template id="wplus-preview-full-caption-template"
+    ><div class="wplus-preview-caption-full" data-text></div
+></template>
+<template id="wplus-viewer-template">
+    <div class="wplus-media-viewer" id="wplus-media-viewer">
+        <div class="wplus-media-topbar">
+            <div class="wplus-media-title" data-title></div>
+            <div class="wplus-media-actions" data-actions></div>
+        </div>
+        <div class="wplus-media-container" data-container></div>
+    </div>
+</template>
+<template id="wplus-viewer-save-template"
+    ><span class="wplus-media-save" data-text></span
+></template>
+<template id="wplus-viewer-close-template"
+    ><span class="wplus-media-close" data-text></span
+></template>
+<template id="wplus-viewer-hint-template"
+    ><div class="wplus-media-hint" data-text></div
+></template>
+<template id="wplus-restore-button-template">
+    <div id="wplus-header-restore" class="wplus-header-restore-wrap">
+        <button class="wplus-header-restore-button">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 16v-2h2v2h-2zm0-4V7h2v6h-2z"
+                /></svg
+            ><span class="wplus-tip">Restore deleted</span>
+        </button>
+    </div>
+</template>
+<template id="wplus-scroll-button-template">
+    <button id="wplus-scroll-up" title="Load older messages">
+        <svg class="wplus-scroll-icon" viewBox="0 0 24 24">
+            <path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z" /></svg
+        ><span class="wplus-count"></span>
+    </button>
+</template>

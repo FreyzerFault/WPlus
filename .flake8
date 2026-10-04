@@ -1,0 +1,8 @@
+[flake8]
+# Include the tray entrypoint while excluding retained verification artifacts.
+filename = *.py,*.pyw
+exclude =
+    .git,
+    __pycache__,
+    service/_orig_inj.py,
+    service/_verify_ps.py

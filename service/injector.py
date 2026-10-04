@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 # WPlus Service v1.2 — by KuchiSofts
 # Smart background service: auto-detects WhatsApp, injects, syncs, reconnects
-import json, http.client, time, os, sys, subprocess
+import http.client
+import json
+import os
+import subprocess
+import sys
+import time
+from typing import Any, TypedDict
+
+
+class CDPTarget(TypedDict):
+    url: str
+    type: str
+    webSocketDebuggerUrl: str
+
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(script_dir)
@@ -14,67 +27,140 @@ FILES = {
 }
 LOG_FILE = os.path.join(DATA_DIR, "debug.log")
 
+# PowerShell snippet reporting whether WhatsApp is running.
+PS_WA_RUNNING = (
+    "Get-Process -Name 'WhatsApp*' -ErrorAction SilentlyContinue"
+    " | Select-Object -First 1 | ForEach-Object { 'yes' }"
+)
+
+# Reads and clears the "sync now" flag, returning "yes"/"no".
+JS_SYNC_FLAG = (
+    '(function(){var f=localStorage.getItem("wplus_sync_now");'
+    'if(f){localStorage.removeItem("wplus_sync_now");return "yes";}'
+    'return "no";})()'
+)
+
+# Reports whether the injected plugin is still alive in the page.
+JS_ALIVE = 'window.__wplus && window.__wplus.ready ? "yes" : "no"'
+
 # Clear log on startup
 with open(LOG_FILE, "w", encoding="utf-8") as f:
-    f.write(f"[WPlus] Session started {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+    stamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    f.write(f"[WPlus] Session started {stamp}\n")
 
-def load_file(path, default="[]"):
+
+def load_file(path: str, default: str = "[]") -> str:
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
-    except:
+    except FileNotFoundError:
         return default
 
-def save_file(path, data):
+
+def save_file(path: str, data: str) -> bool:
     try:
         with open(path, "w", encoding="utf-8") as f:
             f.write(data)
-    except:
-        pass
+        return True
+    except OSError as error:
+        print(f"Could not save {path}: {error}", file=sys.stderr)
+        return False
 
-def get_wa_target():
+
+def get_wa_target() -> CDPTarget | None:
     """Find WhatsApp page via debug port"""
+    connection = http.client.HTTPConnection("127.0.0.1", 9222, timeout=3)
     try:
-        c = http.client.HTTPConnection("127.0.0.1", 9222, timeout=3)
-        c.request("GET", "/json")
-        targets = json.loads(c.getresponse().read())
-        c.close()
-        for t in targets:
-            if "whatsapp" in t.get("url", "") and t["type"] == "page":
-                return t
-    except:
-        pass
+        connection.request("GET", "/json")
+        targets = json.loads(connection.getresponse().read())
+        if not isinstance(targets, list):
+            return None
+        for target in targets:
+            if not isinstance(target, dict):
+                continue
+            url = target.get("url")
+            websocket_url = target.get("webSocketDebuggerUrl")
+            if (
+                target.get("type") == "page"
+                and isinstance(url, str)
+                and "whatsapp" in url
+                and isinstance(websocket_url, str)
+            ):
+                return {
+                    "url": url,
+                    "type": "page",
+                    "webSocketDebuggerUrl": websocket_url,
+                }
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+    finally:
+        connection.close()
     return None
 
-def cdp_eval(ws_url, code):
+
+def cdp_eval(ws_url: str, code: str) -> Any | None:
     """Execute JS in WhatsApp page via CDP"""
-    cdp = json.dumps({"id": 1, "method": "Runtime.evaluate", "params": {"expression": code, "returnByValue": True}})
+    cdp = json.dumps(
+        {
+            "id": 1,
+            "method": "Runtime.evaluate",
+            "params": {
+                "expression": code,
+                "returnByValue": True,
+            },
+        }
+    )
     msg_path = os.path.join(project_dir, "_cdp.json")
     with open(msg_path, "w", encoding="utf-8") as f:
         f.write(cdp)
-    ps = f'$ws=New-Object System.Net.WebSockets.ClientWebSocket;$ct=[System.Threading.CancellationToken]::None;$ws.ConnectAsync([System.Uri]::new("{ws_url}"),$ct).Wait();$msg=[System.IO.File]::ReadAllText("{msg_path}");$b=[System.Text.Encoding]::UTF8.GetBytes($msg);$ws.SendAsync([System.ArraySegment[byte]]::new($b),[System.Net.WebSockets.WebSocketMessageType]::Text,$true,$ct).Wait();$buf=New-Object byte[] 262144;$ws.ReceiveAsync([System.ArraySegment[byte]]::new($buf),$ct).Wait()|Out-Null;[System.Text.Encoding]::UTF8.GetString($buf).Trim([char]0);$ws.Dispose()'
+    ps = (
+        f"$ws=New-Object System.Net.WebSockets.ClientWebSocket;"
+        f"$ct=[System.Threading.CancellationToken]::None;"
+        f'$ws.ConnectAsync([System.Uri]::new("{ws_url}"),$ct).Wait();'
+        f'$msg=[System.IO.File]::ReadAllText("{msg_path}");'
+        f"$b=[System.Text.Encoding]::UTF8.GetBytes($msg);"
+        f"$ws.SendAsync([System.ArraySegment[byte]]::new($b),"
+        f"[System.Net.WebSockets.WebSocketMessageType]::Text,"
+        f"$true,$ct).Wait();"
+        f"$buf=New-Object byte[] 262144;"
+        f"$ws.ReceiveAsync([System.ArraySegment[byte]]::new($buf),$ct)"
+        f".Wait()|Out-Null;"
+        f"[System.Text.Encoding]::UTF8.GetString($buf).Trim([char]0);"
+        f"$ws.Dispose()"
+    )
     try:
-        r = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
-                           capture_output=True, text=True, timeout=30)
+        r = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", ps],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
         os.remove(msg_path)
         outer = json.loads(r.stdout.strip())
         return outer.get("result", {}).get("result", {}).get("value")
-    except:
-        try: os.remove(msg_path)
-        except: pass
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError):
+        try:
+            os.remove(msg_path)
+        except FileNotFoundError:
+            pass
         return None
 
-def is_wa_running():
+
+def is_wa_running() -> bool:
     """Check if WhatsApp process is running"""
     try:
-        r = subprocess.run(["powershell", "-Command",
-            "Get-Process -Name 'WhatsApp*' -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { 'yes' }"],
-            capture_output=True, text=True, timeout=5)
+        r = subprocess.run(
+            ["powershell", "-Command", PS_WA_RUNNING],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
         return "yes" in r.stdout
-    except:
+    except (OSError, subprocess.SubprocessError):
         return False
 
-def inject(ws_url):
+
+def inject(ws_url: str) -> tuple[bool, int]:
     """Inject engine + UI into WhatsApp"""
     # Restore saved data from disk
     restored = 0
@@ -86,45 +172,65 @@ def inject(ws_url):
             restored += 1
 
     # Inject engine + UI
-    with open(os.path.join(project_dir, "engine.js"), "r", encoding="utf-8") as f:
+    with open(
+        os.path.join(project_dir, "engine.js"), "r", encoding="utf-8"
+    ) as f:
         engine = f.read()
     with open(os.path.join(project_dir, "ui.js"), "r", encoding="utf-8") as f:
         ui = f.read()
     result = cdp_eval(ws_url, engine + ";\n" + ui)
     return result == "ok", restored
 
-def sync(ws_url):
+
+def sync(ws_url: str) -> tuple[int, bool]:
     """Pull data from WhatsApp localStorage to disk"""
     changes = 0
     # Check for immediate sync flag
-    flag = cdp_eval(ws_url, '(function(){var f=localStorage.getItem("wplus_sync_now");if(f){localStorage.removeItem("wplus_sync_now");return "yes";}return "no";})()')
+    flag = cdp_eval(
+        ws_url,
+        '(function(){var f=localStorage.getItem("wplus_sync_now");'
+        'if(f){localStorage.removeItem("wplus_sync_now");return "yes";}'
+        'return "no";})()',
+    )
 
     for key, path in FILES.items():
         val = cdp_eval(ws_url, f'localStorage.getItem("{key}")')
-        if val and val != "null":
+        if isinstance(val, str) and val != "null":
             current = load_file(path, "")
             if val != current:
-                save_file(path, val)
-                changes += 1
+                if save_file(path, val):
+                    changes += 1
 
     # Sync debug log
     try:
         log_val = cdp_eval(ws_url, 'localStorage.getItem("wplus_log")')
-        if log_val and log_val != "null":
+        if isinstance(log_val, str) and log_val != "null":
             entries = json.loads(log_val)
             if isinstance(entries, list) and len(entries) > 0:
-                lines = [f"WPlus Debug Log — {time.strftime('%Y-%m-%d %H:%M:%S')}", "=" * 50, ""]
+                lines = [
+                    f"WPlus Debug Log — {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                    "=" * 50,
+                    "",
+                ]
                 for e in entries:
-                    lines.append(f"[{e.get('ts','?')}] [{e.get('cat','?')}] {e.get('msg','')}" +
-                                 (f" | {e.get('data','')}" if e.get('data') else ""))
+                    lines.append(
+                        f"[{e.get('ts', '?')}] [{e.get('cat', '?')}] "
+                        f"{e.get('msg', '')}"
+                        + (
+                            f" | {e.get('data', '')}"
+                            if e.get("data")
+                            else ""
+                        )
+                    )
                 with open(LOG_FILE, "w", encoding="utf-8") as f:
                     f.write("\n".join(lines) + "\n")
-    except:
-        pass
+    except (OSError, ValueError, TypeError, AttributeError) as error:
+        print(f"Could not sync debug log: {error}", file=sys.stderr)
 
     return changes, flag == "yes"
 
-def main():
+
+def main() -> None:
     print()
     print("  WPlus v1.2 — by KuchiSofts")
     print("  ===========================")
@@ -143,7 +249,9 @@ def main():
             if not injected:
                 # Check if WhatsApp is running
                 if not is_wa_running():
-                    print("  Waiting for WhatsApp Desktop...", end="", flush=True)
+                    print(
+                        "  Waiting for WhatsApp Desktop...", end="", flush=True
+                    )
                     while not is_wa_running():
                         print(".", end="", flush=True)
                         time.sleep(3)
@@ -166,18 +274,26 @@ def main():
                     continue
 
                 last_ws_url = wa["webSocketDebuggerUrl"]
-                print(f" connected!", flush=True)
+                print(" connected!", flush=True)
 
                 # Inject
                 print("  Injecting WPlus...", end="", flush=True)
                 ok, restored = inject(last_ws_url)
                 if ok:
-                    print(f" done! ({restored} saved items restored)", flush=True)
+                    print(
+                        f" done! ({restored} saved items restored)", flush=True
+                    )
                     injected = True
                     print()
                     print("  \u2705 WPlus is active!")
-                    print("  \u2022 Settings and messages sync to disk automatically")
-                    print("  \u2022 If WhatsApp restarts, WPlus re-injects automatically")
+                    print(
+                        "  \u2022 Settings and messages sync to disk "
+                        "automatically"
+                    )
+                    print(
+                        "  \u2022 If WhatsApp restarts, WPlus re-injects "
+                        "automatically"
+                    )
                     print("  \u2022 Press Ctrl+C to stop")
                     print()
                     sys.stdout.flush()
@@ -195,12 +311,19 @@ def main():
             if not wa:
                 if injected:
                     # WhatsApp closed — do final sync
-                    print(f"\n  WhatsApp closed. Waiting for restart...", flush=True)
+                    print(
+                        "\n  WhatsApp closed. Waiting for restart...",
+                        flush=True,
+                    )
                     if last_ws_url:
                         try:
                             sync(last_ws_url)
-                        except:
-                            pass
+                        except (
+                            OSError,
+                            ValueError,
+                            subprocess.SubprocessError,
+                        ):
+                            print("  Final sync failed.", file=sys.stderr)
                     injected = False
                     last_ws_url = None
                     continue
@@ -211,9 +334,15 @@ def main():
 
             # Check if plugin is still loaded
             if sync_tick % 10 == 0:  # Every 30 seconds
-                alive = cdp_eval(last_ws_url, 'window.__wplus && window.__wplus.ready ? "yes" : "no"')
+                alive = cdp_eval(
+                    last_ws_url,
+                    'window.__wplus && window.__wplus.ready ? "yes" : "no"',
+                )
                 if alive != "yes":
-                    print("  Plugin lost (page reload?). Re-injecting...", flush=True)
+                    print(
+                        "  Plugin lost (page reload?). Re-injecting...",
+                        flush=True,
+                    )
                     injected = False
                     continue
 
@@ -232,16 +361,29 @@ def main():
             if last_ws_url:
                 try:
                     sync(last_ws_url)
-                except:
-                    pass
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    print("  Final sync failed.", file=sys.stderr)
             print("  Done. Goodbye!")
             break
-        except Exception as e:
-            if "connect" in str(e).lower() or "target" in str(e).lower():
+        except (
+            OSError,
+            ValueError,
+            TypeError,
+            KeyError,
+            AttributeError,
+            RuntimeError,
+            http.client.HTTPException,
+            subprocess.SubprocessError,
+        ) as error:
+            error_text = str(error).lower()
+            if "connect" in error_text or "target" in error_text:
                 if injected:
-                    print(f"\n  Connection lost. Reconnecting...", flush=True)
+                    print("\n  Connection lost. Reconnecting...", flush=True)
                     injected = False
+            else:
+                print(f"\n  Service error: {error}", file=sys.stderr)
             time.sleep(3)
+
 
 if __name__ == "__main__":
     main()

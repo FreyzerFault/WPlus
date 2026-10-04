@@ -6,13 +6,15 @@ export const LS = {
   get<T>(key: string, fallback: T): T {
     try {
       const val = localStorage.getItem(key);
-      return val ? JSON.parse(val) : fallback;
+      if (!val) return fallback;
+      const parsed: unknown = JSON.parse(val);
+      return parsed as T;
     } catch {
       return fallback;
     }
   },
-  set(key: string, value: any): void {
-    localStorage.setItem(key, JSON.stringify(value));
+  set(key: string, value: unknown): void {
+    localStorage.setItem(key, String(JSON.stringify(value)));
   },
   del(key: string): void {
     localStorage.removeItem(key);
@@ -20,10 +22,19 @@ export const LS = {
 };
 
 // Settings
-export function settings(key?: string, value?: any): any {
-  const s = LS.get<SavedSettings>(STORAGE.settings, {} as SavedSettings);
-  if (value === undefined) return key ? (s as any)[key] : s;
-  (s as any)[key!] = value;
+export function settings(): SavedSettings;
+export function settings<K extends keyof SavedSettings>(key: K): SavedSettings[K] | undefined;
+export function settings<K extends keyof SavedSettings>(
+  key: K,
+  value: SavedSettings[K],
+): SavedSettings[K];
+export function settings(
+  key?: keyof SavedSettings,
+  value?: SavedSettings[keyof SavedSettings],
+): SavedSettings | SavedSettings[keyof SavedSettings] | undefined {
+  const s = LS.get<SavedSettings>(STORAGE.settings, {});
+  if (value === undefined) return key ? s[key] : s;
+  s[key as keyof SavedSettings] = value as SavedSettings[keyof SavedSettings];
   LS.set(STORAGE.settings, s);
   return value;
 }

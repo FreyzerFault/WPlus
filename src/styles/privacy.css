@@ -1,0 +1,7 @@
+__WPLUS_SELECTORS__ {
+    filter: blur(__WPLUS_BLUR__px) !important;
+    transition: filter 0.15s !important;
+}
+__WPLUS_HOVER_SELECTORS__ {
+    filter: none !important;
+}
