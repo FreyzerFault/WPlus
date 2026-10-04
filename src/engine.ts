@@ -152,6 +152,7 @@ function boot(): void {
 
     // Cleanup function for uninject
     wplus.cleanup = () => {
+        window.__wplusStickerImportCleanup?.()
         cleanupPrivacy()
         cleanupDebug()
         ;[

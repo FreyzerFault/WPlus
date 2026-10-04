@@ -35,6 +35,10 @@ class CDPTarget(TypedDict):
 
 CURRENT_VERSION = "2.0.0"
 GITHUB_REPO = "KuchiSofts/WPlus"
+CDP_PORT = 9223
+CDP_ARGUMENTS = (
+    f"--remote-debugging-port={CDP_PORT} --remote-allow-origins=*"
+)
 
 if getattr(sys, "frozen", False):
     EXE_DIR = os.path.dirname(sys.executable)
@@ -53,47 +57,54 @@ def ensure_debug_port() -> bool:
     key_path = (
         r"Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
     )
-    value = "--remote-debugging-port=9222 --remote-allow-origins=*"
     configured = False
     try:
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ
-        )
-        existing = winreg.QueryValueEx(key, "*")[0]
-        winreg.CloseKey(key)
-        if "9222" in existing:
-            return False
-    except (FileNotFoundError, OSError):
-        pass
-    try:
         key = winreg.CreateKeyEx(
-            winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_WRITE
+            winreg.HKEY_CURRENT_USER,
+            key_path,
+            0,
+            winreg.KEY_READ | winreg.KEY_WRITE,
         )
-        winreg.SetValueEx(key, "*", 0, winreg.REG_SZ, value)
+        try:
+            existing = winreg.QueryValueEx(key, "*")[0]
+        except FileNotFoundError:
+            existing = None
+        if existing != CDP_ARGUMENTS:
+            winreg.SetValueEx(key, "*", 0, winreg.REG_SZ, CDP_ARGUMENTS)
+            configured = True
         winreg.CloseKey(key)
-        configured = True
     except PermissionError:
-        # The policy key may be protected; WebView2 also supports the
-        # per-user environment variable configured below.
+        # WebView2 also supports the per-user environment variable below.
         pass
     except OSError as error:
         print(
             f"Could not set WebView2 registry policy: {error}",
             file=sys.stderr,
         )
+
     try:
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_WRITE
-        )
-        winreg.SetValueEx(
-            key,
-            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+        key = winreg.CreateKeyEx(
+            winreg.HKEY_CURRENT_USER,
+            "Environment",
             0,
-            winreg.REG_SZ,
-            value,
+            winreg.KEY_READ | winreg.KEY_WRITE,
         )
+        try:
+            existing = winreg.QueryValueEx(
+                key, "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+            )[0]
+        except FileNotFoundError:
+            existing = None
+        if existing != CDP_ARGUMENTS:
+            winreg.SetValueEx(
+                key,
+                "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                0,
+                winreg.REG_SZ,
+                CDP_ARGUMENTS,
+            )
+            configured = True
         winreg.CloseKey(key)
-        configured = True
     except PermissionError as error:
         print(
             f"Could not set WebView2 environment: {error}",
@@ -104,6 +115,47 @@ def ensure_debug_port() -> bool:
             f"Could not set WebView2 environment: {error}",
             file=sys.stderr,
         )
+
+    os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = CDP_ARGUMENTS
+    if configured:
+        try:
+            import ctypes
+
+            send_message_timeout = (
+                ctypes.windll.user32.SendMessageTimeoutW
+            )
+            send_message_timeout.argtypes = (
+                ctypes.c_void_p,
+                ctypes.c_uint,
+                ctypes.c_size_t,
+                ctypes.c_void_p,
+                ctypes.c_uint,
+                ctypes.c_uint,
+                ctypes.POINTER(ctypes.c_size_t),
+            )
+            send_message_timeout.restype = ctypes.c_ssize_t
+            result = ctypes.c_size_t()
+            sent = send_message_timeout(
+                ctypes.c_void_p(0xFFFF),
+                0x001A,
+                0,
+                ctypes.cast(
+                    ctypes.c_wchar_p("Environment"), ctypes.c_void_p
+                ),
+                0x0002,
+                5000,
+                ctypes.byref(result),
+            )
+            if not sent:
+                print(
+                    "Windows did not acknowledge the WebView2 setting change.",
+                    file=sys.stderr,
+                )
+        except (AttributeError, OSError) as error:
+            print(
+                f"Could not notify Windows about the WebView2 setting: {error}",
+                file=sys.stderr,
+            )
     return configured
 
 
@@ -154,6 +206,8 @@ def setup() -> None:
                 print(f"Could not copy {filename}: {error}", file=sys.stderr)
 
     src_fs = os.path.join(BUNDLE_DIR, "fileserver.py")
+    if not os.path.exists(src_fs):
+        src_fs = os.path.join(EXE_DIR, "service", "fileserver.py")
     if os.path.exists(src_fs):
         try:
             with open(src_fs, "r", encoding="utf-8") as f:
@@ -190,7 +244,12 @@ try:
         start_file_server = fileserver.start_server
     else:
         raise ImportError("No fileserver")
-except (ImportError, OSError, AttributeError):
+except (ImportError, OSError, AttributeError) as error:
+    print(
+        f"Could not load the full WPlus file server: {error}",
+        file=sys.stderr,
+    )
+
     from http.server import HTTPServer, BaseHTTPRequestHandler
 
     class MinHandler(BaseHTTPRequestHandler):
@@ -204,21 +263,40 @@ except (ImportError, OSError, AttributeError):
                 "Access-Control-Allow-Methods", "GET, POST, OPTIONS"
             )
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header(
+                "Access-Control-Allow-Private-Network", "true"
+            )
             self.end_headers()
 
         def do_GET(self):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header(
+                "Access-Control-Allow-Private-Network", "true"
+            )
             self.end_headers()
             self.wfile.write(b"[]")
 
         def do_POST(self):
-            self.send_response(200)
+            if self.path.split("?", 1)[0] == "/sticker/convert":
+                self.send_response(503)
+                response = json.dumps({
+                    "error": (
+                        "El conversor de stickers no está disponible. "
+                        "Reinicia WPlus para cargar su servidor local."
+                    )
+                }).encode("utf-8")
+            else:
+                self.send_response(200)
+                response = b'{"ok":true}'
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header(
+                "Access-Control-Allow-Private-Network", "true"
+            )
             self.end_headers()
-            self.wfile.write(b'{"ok":true}')
+            self.wfile.write(response)
 
     def start_file_server(port):
         s = HTTPServer(("127.0.0.1", port), MinHandler)
@@ -271,7 +349,9 @@ def save_file(path: str, data: str) -> bool:
 
 
 def get_wa_target() -> CDPTarget | None:
-    connection = http.client.HTTPConnection("127.0.0.1", 9222, timeout=3)
+    connection = http.client.HTTPConnection(
+        "127.0.0.1", CDP_PORT, timeout=3
+    )
     try:
         connection.request("GET", "/json")
         targets = json.loads(connection.getresponse().read())
@@ -848,7 +928,8 @@ def service_loop() -> None:
 
         if not wa:
             log(
-                "Connection failed: no WhatsApp page found on CDP port 9222 "
+                f"Connection failed: no WhatsApp page found on CDP port "
+                f"{CDP_PORT} "
                 "after 40 seconds."
             )
             return False

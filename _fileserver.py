@@ -19,7 +19,7 @@ from PIL import Image, ImageSequence
 
 # NOTE: wplus.py rewrites the __file__ expression below when freezing the
 # app into an EXE, so it must stay on a single line and keep its exact text.
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_BASE_DIR = r"D:\Tools\WPlus"
 
 DATA_DIR = os.path.join(_BASE_DIR, "data")
 MEDIA_DIRS = {

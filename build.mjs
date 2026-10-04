@@ -96,6 +96,9 @@ execFileSync(
     "--add-data",
     "ui.js;.",
 
+    "--add-data",
+    "service/fileserver.py;.",
+
     "service/wplus.py",
   ],
   {
@@ -104,4 +107,3 @@ execFileSync(
 );
 
 console.log("WPlus.exe generado.");
-

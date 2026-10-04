@@ -181,6 +181,7 @@ export interface WACollection<T> {
 declare global {
     interface Window {
         __wplus?: Partial<WPlusState>
+        __wplusStickerImportCleanup?: () => void
         require?: (moduleName: string) => unknown
     }
 }

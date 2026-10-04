@@ -50,6 +50,11 @@ On first run WPlus configures itself automatically. If WhatsApp is already open 
 | **No read receipts** | Disable blue ticks. |
 | **Private audio** | Listen to voice messages without notifying sender. |
 
+### Stickers
+| Feature | Description |
+|---------|-------------|
+| **GIF and image stickers** | Drop or import a GIF or image into a chat and use the WPlus action to convert it to a WhatsApp-sized WebP sticker and send it through WhatsApp. Animated GIFs are encoded as animated WebP. |
+
 ### Tools
 | Feature | Description |
 |---------|-------------|
@@ -64,7 +69,7 @@ On first run WPlus configures itself automatically. If WhatsApp is already open 
 
 ## How It Works
 
-WPlus runs as a lightweight system tray app. It connects to WhatsApp Desktop through its WebView2 debug bridge and injects two JavaScript files.
+WPlus runs as a lightweight system tray app. It connects to WhatsApp Desktop through its WebView2 debug bridge on port 9223 and injects two JavaScript files. The bridge uses a per-user WebView2 setting; after first setup or a port change, fully close and reopen WhatsApp so its WebView2 process picks up the new setting.
 
 ```
 WPlus.exe (tray)

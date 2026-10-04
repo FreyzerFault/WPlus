@@ -22,6 +22,7 @@ interface UiWPlusAPI {
 }
 
 interface UiWAChat {
+    id?: { _serialized?: string }
     __x_name?: string
     __x_formattedTitle?: string
     __x_active?: boolean
@@ -36,9 +37,41 @@ interface UiWALoadMessages {
     loadEarlierMsgs: (chat: UiWAChat) => Promise<unknown>
 }
 
+interface UiWAPreparedMedia {
+    waitForPrep: () => Promise<unknown>
+}
+
 interface UiWAModules {
     WAWebChatCollection: { ChatCollection: UiWAChatCollection }
     WAWebChatLoadMessages: UiWALoadMessages
+    WAWebMediaOpaqueData: {
+        createFromData: (data: File, mime: string) => unknown
+    }
+    WAWebMedia: {
+        prepRawMedia: (
+            mediaData: unknown,
+            options: {
+                isPtt: boolean
+                asDocument: boolean
+                asGif: boolean
+                isAudio: boolean
+                asSticker: boolean
+                precomputedFields: { duration: null; waveform: null }
+            },
+        ) => UiWAPreparedMedia
+    }
+    WAWebMediaPrep: {
+        sendMediaMsgToChat: (request: {
+            chat: UiWAChat
+            options: {
+                addEvenWhilePreparing: boolean
+                caption: string
+                type: 'sticker'
+            }
+            prep: UiWAPreparedMedia
+            earlyUpload: null
+        }) => Promise<unknown>
+    }
 }
 
 function waRequire<T extends keyof UiWAModules>(name: T): UiWAModules[T] {
@@ -131,6 +164,286 @@ function waRequire<T extends keyof UiWAModules>(name: T): UiWAModules[T] {
     css.id = 'wplus-css'
     css.textContent = uiStyles
     document.head.appendChild(css)
+
+    type StickerImport = { file: File; chatId: string }
+    type StickerConversion = {
+        webp: string
+        animated: boolean
+        frames: number
+        durationMs: number
+        size: number
+        error?: string
+    }
+    type StickerWindow = Window & {
+        __wplusStickerImportCleanup?: () => void
+    }
+    var stickerWindow = window as StickerWindow
+    if (stickerWindow.__wplusStickerImportCleanup)
+        stickerWindow.__wplusStickerImportCleanup()
+
+    var pendingSticker: StickerImport | null = null
+    var stickerAction: HTMLDivElement | null = null
+    var stickerStatus: HTMLSpanElement | null = null
+    var stickerButton: HTMLButtonElement | null = null
+    var lastImportedKey = ''
+    var lastImportedAt = 0
+
+    function activeChat(): UiWAChat | null {
+        try {
+            var chats = waRequire('WAWebChatCollection').ChatCollection
+            return (
+                chats._models?.find(function (chat) {
+                    return chat.__x_active && chat.id?._serialized
+                }) || null
+            )
+        } catch (error) {
+            console.error('[WPlus:sticker] Could not find active chat:', error)
+            return null
+        }
+    }
+
+    function isStickerImage(file: File): boolean {
+        return (
+            file.type.toLowerCase().startsWith('image/') ||
+            /\.(gif|jpe?g|png|webp|bmp)$/i.test(file.name)
+        )
+    }
+
+    function collectStickerFile(files: FileList | null): void {
+        if (!files) return
+        var file: File | undefined
+        for (var i = 0; i < files.length; i++) {
+            if (isStickerImage(files[i])) {
+                file = files[i]
+                break
+            }
+        }
+        if (!file) return
+        var chat = activeChat()
+        var chatId = chat?.id?._serialized
+        if (!chatId) return
+
+        var key = file.name + ':' + file.size + ':' + file.lastModified
+        var now = Date.now()
+        if (key === lastImportedKey && now - lastImportedAt < 1500) {
+            return
+        }
+        lastImportedKey = key
+        lastImportedAt = now
+        pendingSticker = { file: file, chatId: chatId }
+
+        if (!stickerAction) {
+            stickerAction = document.createElement('div')
+            stickerAction.id = 'wplus-sticker-action'
+            stickerAction.setAttribute('role', 'status')
+            stickerAction.setAttribute('aria-live', 'polite')
+            stickerButton = document.createElement('button')
+            stickerButton.type = 'button'
+            stickerButton.className = 'wplus-sticker-send'
+            stickerStatus = document.createElement('span')
+            stickerStatus.className = 'wplus-sticker-status'
+            stickerAction.append(stickerButton, stickerStatus)
+            stickerAction.addEventListener('click', function (event) {
+                event.stopPropagation()
+            })
+            document.body.appendChild(stickerAction)
+            stickerButton.addEventListener('click', function () {
+                void convertAndSendSticker()
+            })
+        }
+
+        stickerButton!.disabled = false
+        stickerButton!.textContent = 'Convertir y enviar como sticker'
+        stickerStatus!.textContent =
+            file.name +
+            (file.type === 'image/gif' || /\.gif$/i.test(file.name)
+                ? ' · GIF animado'
+                : ' · imagen')
+        stickerAction.hidden = false
+    }
+
+    function bytesToBase64(bytes: Uint8Array): string {
+        var binary = ''
+        for (var offset = 0; offset < bytes.length; offset += 0x8000) {
+            binary += String.fromCharCode.apply(
+                null,
+                Array.prototype.slice.call(bytes, offset, offset + 0x8000),
+            )
+        }
+        return btoa(binary)
+    }
+
+    function base64ToBytes(encoded: string): Uint8Array {
+        var binary = atob(encoded)
+        var bytes = new Uint8Array(binary.length)
+        for (var i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i)
+        }
+        return bytes
+    }
+
+    async function convertAndSendSticker(): Promise<void> {
+        if (!pendingSticker || !stickerButton || !stickerStatus) return
+        var candidate = pendingSticker
+        var originalButtonText = stickerButton.textContent
+        stickerButton.disabled = true
+        stickerButton.textContent = 'Convirtiendo…'
+        stickerStatus.textContent = 'Preparando WebP para WhatsApp'
+
+        try {
+            if (activeChat()?.id?._serialized !== candidate.chatId) {
+                throw new Error(
+                    'El chat activo ha cambiado. Vuelve a importar la imagen en el chat de destino.',
+                )
+            }
+            if (candidate.file.size > 20 * 1024 * 1024) {
+                throw new Error('La imagen supera el límite de 20 MB.')
+            }
+            var source = bytesToBase64(
+                new Uint8Array(await candidate.file.arrayBuffer()),
+            )
+            var response = await fetch(
+                'http://127.0.0.1:18733/sticker/convert',
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: source }),
+                },
+            )
+            var result = (await response.json()) as StickerConversion
+            if (!response.ok) {
+                throw new Error(
+                    result.error || 'No se pudo convertir esta imagen.',
+                )
+            }
+            if (!result.webp) {
+                throw new Error('El servidor no devolvió el sticker WebP.')
+            }
+
+            var webpBytes = base64ToBytes(result.webp)
+            var webpBuffer = new ArrayBuffer(webpBytes.byteLength)
+            new Uint8Array(webpBuffer).set(webpBytes)
+            var webp = new File(
+                [webpBuffer],
+                candidate.file.name.replace(/\.[^.]+$/, '') + '.webp',
+                { type: 'image/webp', lastModified: Date.now() },
+            )
+            stickerButton.textContent = 'Enviando sticker…'
+            stickerStatus.textContent = result.animated
+                ? 'WebP animado · ' + result.frames + ' fotogramas'
+                : 'Sticker WebP estático'
+
+            var opaqueData = waRequire(
+                'WAWebMediaOpaqueData',
+            ).createFromData(webp, webp.type)
+            var prepared = waRequire('WAWebMedia').prepRawMedia(opaqueData, {
+                isPtt: false,
+                asDocument: false,
+                asGif: false,
+                isAudio: false,
+                asSticker: true,
+                precomputedFields: { duration: null, waveform: null },
+            })
+            await prepared.waitForPrep()
+            var chat = activeChat()
+            if (chat?.id?._serialized !== candidate.chatId) {
+                throw new Error(
+                    'El chat activo ha cambiado. No se envió el sticker.',
+                )
+            }
+            var sent = await waRequire(
+                'WAWebMediaPrep',
+            ).sendMediaMsgToChat({
+                chat: chat,
+                options: {
+                    addEvenWhilePreparing: false,
+                    caption: '',
+                    type: 'sticker',
+                },
+                prep: prepared,
+                earlyUpload: null,
+            })
+            if (!sent) {
+                throw new Error('WhatsApp no confirmó el envío del sticker.')
+            }
+            stickerButton.textContent = 'Sticker enviado'
+            stickerStatus.textContent = result.animated
+                ? 'WebP animado · ' + result.size + ' bytes'
+                : 'WebP · ' + result.size + ' bytes'
+            window.setTimeout(function () {
+                stickerAction?.remove()
+                stickerAction = null
+                stickerButton = null
+                stickerStatus = null
+                pendingSticker = null
+            }, 3000)
+        } catch (error) {
+            stickerButton.textContent = originalButtonText || 'Reintentar'
+            stickerStatus.textContent =
+                error instanceof TypeError &&
+                error.message.toLowerCase().includes('fetch')
+                    ? 'No se pudo conectar al conversor local (127.0.0.1:18733). Comprueba que WPlus esté abierto; reinícialo si acabas de actualizarlo y autoriza el acceso a la red local si WebView2 lo solicita.'
+                    : error instanceof Error
+                    ? error.message
+                    : 'Error al convertir la imagen.'
+            console.error('[WPlus:sticker] ' + stickerStatus.textContent)
+        } finally {
+            if (stickerButton?.isConnected) stickerButton.disabled = false
+        }
+    }
+
+    var stickerDropHandler = function (event: DragEvent) {
+        var files = event.dataTransfer?.files
+        if (
+            stickerButton?.disabled ||
+            !activeChat() ||
+            !files ||
+            files.length !== 1 ||
+            !isStickerImage(files[0])
+        )
+            return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        collectStickerFile(files)
+    }
+    var stickerPasteHandler = function (event: ClipboardEvent) {
+        var files = event.clipboardData?.files
+        if (
+            stickerButton?.disabled ||
+            !activeChat() ||
+            !files ||
+            files.length !== 1 ||
+            !isStickerImage(files[0])
+        )
+            return
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        collectStickerFile(files)
+    }
+    var stickerInputHandler = function (event: Event) {
+        var input = event.target
+        if (
+            !stickerButton?.disabled &&
+            input instanceof HTMLInputElement &&
+            input.type === 'file' &&
+            input.files?.length === 1 &&
+            isStickerImage(input.files[0]) &&
+            activeChat()
+        ) {
+            event.stopImmediatePropagation()
+            collectStickerFile(input.files)
+        }
+    }
+    document.addEventListener('drop', stickerDropHandler, true)
+    document.addEventListener('paste', stickerPasteHandler, true)
+    document.addEventListener('change', stickerInputHandler, true)
+    stickerWindow.__wplusStickerImportCleanup = function () {
+        document.removeEventListener('drop', stickerDropHandler, true)
+        document.removeEventListener('paste', stickerPasteHandler, true)
+        document.removeEventListener('change', stickerInputHandler, true)
+        document.getElementById('wplus-sticker-action')?.remove()
+        stickerWindow.__wplusStickerImportCleanup = undefined
+    }
 
     var dc = delC()
 

@@ -893,6 +893,7 @@ ${unread} unread \xB7 ${cc} contacts \xB7 ${totalMsgs} loaded
       settings: settings()
     }));
     wplus.cleanup = () => {
+      window.__wplusStickerImportCleanup?.();
       cleanupPrivacy();
       cleanupDebug();
       [
